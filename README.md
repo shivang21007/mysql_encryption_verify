@@ -10,6 +10,7 @@ A comprehensive Python script to scan all tables in a MySQL database and check w
 - 💾 **JSON Export**: Saves results to JSON files for further analysis
 - 🎯 **Algorithm Detection**: Identifies encryption algorithms (AES, DES, 3DES)
 - 📋 **Progress Tracking**: Shows real-time scanning progress
+- 
 
 ## Installation
 
