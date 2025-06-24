@@ -49,6 +49,50 @@ python main.py \
 | `--password` | MySQL password | - | **Yes** |
 | `--database` | Database name to scan | - | **Yes** |
 | `--output` | Output JSON file name | auto-generated | No |
+| `--email` | Send email report to this address | - | No |
+| `--email-username` | Sender email address (Gmail) | - | No |
+| `--email-password` | Sender email password or app password | - | No |
+
+## Email Reporting Feature
+
+The scanner now supports sending encrypted HTML email reports with JSON attachments.
+
+### Email Setup
+
+1. **Gmail Configuration**:
+   - Enable 2-Factor Authentication on your Gmail account
+   - Generate an App Password:
+     - Go to Google Account Settings → Security
+     - Under "2-Step Verification", click "App passwords"
+     - Generate a new app password for "Mail"
+   - Use this app password instead of your regular Gmail password
+
+2. **Email Usage**:
+   ```bash
+   python main.py \
+     --user your_username \
+     --password your_password \
+     --database your_database \
+     --email recipient@example.com \
+     --email-username your_email@gmail.com \
+     --email-password your_app_password
+   ```
+
+### Email Report Features
+
+- **HTML Email Body**: Beautiful, formatted report with encryption summary
+- **JSON Attachment**: Complete scan results attached as JSON file
+- **Color-coded Results**: Green for encrypted, red for unencrypted tables
+- **Professional Styling**: Clean, modern email design
+- **Security Summary**: Encryption rate and detailed statistics
+
+### Email Report Example
+
+The email includes:
+- 📊 **Scan Summary**: Database name, total tables, encryption statistics
+- 📋 **Detailed Table Results**: Status, encryption type, and algorithm for each table
+- 📎 **JSON Attachment**: Complete scan data for further analysis
+- 🎨 **Professional Formatting**: HTML email with color-coded results
 
 ## What the Script Checks
 
@@ -207,7 +251,7 @@ python main.py \
   --user dbuser \
   --password dbpass \
   --database production_db \
-  --output production_encryption_report.json
+  --output encryption_report.json
 ```
 
 ### Example 3: Using Environment Variables (Recommended)
@@ -220,6 +264,32 @@ python main.py \
   --user $MYSQL_USER \
   --password $MYSQL_PASSWORD \
   --database $MYSQL_DATABASE
+```
+
+### Example 4: Email Report with JSON Attachment
+```bash
+python main.py \
+  --user dbuser \
+  --password dbpass \
+  --database production_db \
+  --output encryption_report.json \
+  --email admin@company.com \
+  --email-username scanner@gmail.com \
+  --email-password your_gmail_app_password
+```
+
+### Example 5: Complete Email Report (Auto-generated JSON)
+```bash
+python main.py \
+  --host 192.168.1.100 \
+  --port 3306 \
+  --user dbuser \
+  --password dbpass \
+  --database security_db \
+  --output encryption_report.json \
+  --email security-team@company.com \
+  --email-username scanner@gmail.com \
+  --email-password your_app_password
 ```
 
 ## Contributing

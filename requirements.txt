@@ -1,1 +1,2 @@
-mysql-connector-python>=8.0.0 
+mysql-connector-python>=8.0.0
+# Email functionality is built into Python standard library (smtplib, email.mime) 

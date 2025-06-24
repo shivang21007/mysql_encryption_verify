@@ -1,2 +1,5 @@
-encryption_report.json
+*.json
 .venv/
+__pycache__/
+*.html
+test_email_demo.py

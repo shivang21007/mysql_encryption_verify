@@ -11,6 +11,12 @@ import sys
 import argparse
 from typing import Dict, List, Tuple
 import json
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
+from datetime import datetime
+import os
 
 
 class MySQLEncryptionScanner:
@@ -206,6 +212,7 @@ class MySQLEncryptionScanner:
         print(f"📋 Found {len(tables)} tables to scan.")
         
         results = {
+            'host': self.host,
             'database': self.database,
             'total_tables': len(tables),
             'encrypted_tables': 0,
@@ -230,7 +237,7 @@ class MySQLEncryptionScanner:
     def print_summary(self, results: Dict):
         """Print a summary of the encryption scan results."""
         print("\n" + "="*60)
-        print("🔐 ENCRYPTION SCAN SUMMARY")
+        print(f"🔐 ENCRYPTION SCAN SUMMARY : {self.host}")
         print("="*60)
         print(f"Database: {results['database']}")
         print(f"Total Tables: {results['total_tables']}")
@@ -267,6 +274,142 @@ class MySQLEncryptionScanner:
             print(f"❌ Error saving results: {e}")
 
 
+class EmailReporter:
+    """Email reporting functionality for MySQL encryption scan results."""
+    
+    def __init__(self, smtp_server: str = "smtp.gmail.com", smtp_port: int = 587):
+        """Initialize email reporter with SMTP settings."""
+        self.smtp_server = smtp_server
+        self.smtp_port = smtp_port
+        self.sender_email = None
+        self.sender_password = None
+        
+    def configure_sender(self, email: str, password: str):
+        """Configure sender email and password."""
+        self.sender_email = email
+        self.sender_password = password
+        
+    def create_email_body(self, results: Dict) -> str:
+        """Create HTML email body from scan results."""
+        html_body = f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                .header {{ background-color: #2c3e50; color: white; padding: 20px; border-radius: 5px; }}
+                .summary {{ background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin: 20px 0; }}
+                .table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+                .table th, .table td {{ border: 1px solid #ddd; padding: 12px; text-align: left; }}
+                .table th {{ background-color: #34495e; color: white; }}
+                .encrypted {{ background-color: #d5f4e6; color: #27ae60; }}
+                .not-encrypted {{ background-color: #fadbd8; color: #e74c3c; }}
+                .status-encrypted {{ color: #27ae60; font-weight: bold; }}
+                .status-not-encrypted {{ color: #e74c3c; font-weight: bold; }}
+                .footer {{ background-color: #95a5a6; color: white; padding: 15px; border-radius: 5px; margin-top: 20px; text-align: center; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>🔐 MySQL Database Encryption Scan Report : ({results['host']})</h1>
+                <p>Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            </div>
+            
+            <div class="summary">
+                <h2>📊 Scan Summary</h2>
+                <p><strong>Database:</strong> {results['database']}</p>
+                <p><strong>Total Tables:</strong> {results['total_tables']}</p>
+                <p><strong>Encrypted Tables:</strong> {results['encrypted_tables']}</p>
+                <p><strong>Unencrypted Tables:</strong> {results['unencrypted_tables']}</p>
+                <p><strong>Encryption Rate:</strong> {(results['encrypted_tables']/results['total_tables'])*100:.1f}%</p>
+            </div>
+            
+            <h2>📋 Detailed Results</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Table Name</th>
+                        <th>Status</th>
+                        <th>Encryption Type</th>
+                        <th>Algorithm</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        
+        for table in results['tables']:
+            status_class = "status-encrypted" if table['encrypted'] else "status-not-encrypted"
+            row_class = "encrypted" if table['encrypted'] else "not-encrypted"
+            status_text = "🔒 ENCRYPTED" if table['encrypted'] else "🔓 NOT ENCRYPTED"
+            
+            html_body += f"""
+                    <tr class="{row_class}">
+                        <td><strong>{table['table_name']}</strong></td>
+                        <td class="{status_class}">{status_text}</td>
+                        <td>{table['encryption_type'] or 'N/A'}</td>
+                        <td>{table['encryption_algorithm'] or 'N/A'}</td>
+                    </tr>
+            """
+            
+        html_body += """
+                </tbody>
+            </table>
+            
+            <div class="footer">
+                <p>This report was generated by MySQL Database Encryption Scanner</p>
+                <p>For security questions, please contact your database administrator</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        return html_body
+        
+    def send_email_report(self, results: Dict, recipient_email: str, json_file_path: str = None) -> bool:
+        """Send email report with scan results."""
+        if not self.sender_email or not self.sender_password:
+            print("❌ Email sender not configured. Please set email and password.")
+            return False
+            
+        try:
+            # Create message
+            msg = MIMEMultipart()
+            msg['From'] = self.sender_email
+            msg['To'] = recipient_email
+            msg['Subject'] = f"🔐 MySQL Encryption Scan Report : ({results['host']}) : ({results['database']}) : ({datetime.now().strftime('%Y-%m-%d')})"
+            
+            # Create email body
+            html_body = self.create_email_body(results)
+            msg.attach(MIMEText(html_body, 'html'))
+            
+            # Attach JSON report if provided
+            if json_file_path and os.path.exists(json_file_path):
+                with open(json_file_path, 'rb') as f:
+                    json_attachment = MIMEApplication(f.read(), _subtype='json')
+                    json_attachment.add_header('Content-Disposition', 'attachment', 
+                                             filename=os.path.basename(json_file_path))
+                    msg.attach(json_attachment)
+            
+            # Send email
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.sender_email, self.sender_password)
+                server.send_message(msg)
+                
+            print(f"✅ Email report sent successfully to: {recipient_email}")
+            return True
+            
+        except smtplib.SMTPAuthenticationError:
+            print("❌ Email authentication failed. Please check your email and password.")
+            print("💡 Note: You may need to use an App Password if 2FA is enabled on your Google account.")
+            return False
+        except smtplib.SMTPException as e:
+            print(f"❌ Email sending failed: {e}")
+            return False
+        except Exception as e:
+            print(f"❌ Unexpected error sending email: {e}")
+            return False
+
+
 def main():
     parser = argparse.ArgumentParser(description='MySQL Database Encryption Scanner')
     parser.add_argument('--host', default='localhost', help='MySQL host (default: localhost)')
@@ -275,6 +418,11 @@ def main():
     parser.add_argument('--password', required=True, help='MySQL password')
     parser.add_argument('--database', required=True, help='Database name to scan')
     parser.add_argument('--output', help='Output JSON file name (optional)')
+    
+    # Email arguments
+    parser.add_argument('--email', help='Send email report to this address')
+    parser.add_argument('--email-username', help='Sender email address (Gmail)')
+    parser.add_argument('--email-password', help='Sender email password or app password')
     
     args = parser.parse_args()
 
@@ -300,10 +448,29 @@ def main():
             scanner.print_summary(results)
             
             # Save results if requested
+            json_file_path = None
             if args.output:
                 scanner.save_results(results, args.output)
+                json_file_path = args.output
             else:
                 scanner.save_results(results)
+                json_file_path = f"encryption_scan_{results['database']}_{results['total_tables']}_tables.json"
+            
+            # Send email report if requested
+            if args.email:
+                if not args.email_username or not args.email_password:
+                    print("❌ Email sender and password are required for email functionality.")
+                    print("Usage: --email-username your_email@gmail.com --email-password your_gmail_app_password")
+                    sys.exit(1)
+                
+                print(f"\n📧 Sending email report to: {args.email}")
+                email_reporter = EmailReporter()
+                email_reporter.configure_sender(args.email_username, args.email_password)
+                
+                if email_reporter.send_email_report(results, args.email, json_file_path):
+                    print("✅ Email report sent successfully!")
+                else:
+                    print("❌ Failed to send email report.")
         else:
             print("❌ No results obtained from scan.")
             
