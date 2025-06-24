@@ -166,9 +166,9 @@ The script generates a detailed JSON report:
 {
   "database": "my_database",
   "total_tables": 5,
-  "encrypted_tables": 2,
-  "unencrypted_tables": 3,
-  "tables": [
+  "encrypted_tables_count": 2,
+  "unencrypted_tables_count": 3,
+  "encrypted_tables": [
     {
       "table_name": "sensitive_data",
       "encrypted": true,
@@ -198,6 +198,44 @@ The script generates a detailed JSON report:
             "encrypted": true
           }
         ]
+      }
+    }
+  ],
+  "unencrypted_tables": [
+    {
+      "table_name": "users",
+      "encrypted": false,
+      "encryption_type": null,
+      "encryption_algorithm": null,
+      "encryption_key": null,
+      "details": {
+        "create_options": "",
+        "table_comment": "",
+        "create_statement": "CREATE TABLE `users` (...)"
+      }
+    },
+    {
+      "table_name": "logs",
+      "encrypted": false,
+      "encryption_type": null,
+      "encryption_algorithm": null,
+      "encryption_key": null,
+      "details": {
+        "create_options": "",
+        "table_comment": "",
+        "create_statement": "CREATE TABLE `logs` (...)"
+      }
+    },
+    {
+      "table_name": "config",
+      "encrypted": false,
+      "encryption_type": null,
+      "encryption_algorithm": null,
+      "encryption_key": null,
+      "details": {
+        "create_options": "",
+        "table_comment": "",
+        "create_statement": "CREATE TABLE `config` (...)"
       }
     }
   ]

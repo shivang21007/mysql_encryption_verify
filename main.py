@@ -215,21 +215,23 @@ class MySQLEncryptionScanner:
             'host': self.host,
             'database': self.database,
             'total_tables': len(tables),
-            'encrypted_tables': 0,
-            'unencrypted_tables': 0,
-            'tables': []
+            'encrypted_tables_count': 0,
+            'unencrypted_tables_count': 0,
+            'encrypted_tables': [],
+            'unencrypted_tables': []
         }
 
         for i, table_name in enumerate(tables, 1):
             print(f"  [{i}/{len(tables)}] Scanning table: {table_name}")
             table_result = self.check_table_encryption_status(table_name)
-            results['tables'].append(table_result)
             
             if table_result['encrypted']:
-                results['encrypted_tables'] += 1
+                results['encrypted_tables'].append(table_result)
+                results['encrypted_tables_count'] += 1
                 print(f"    ✅ {table_name} - ENCRYPTED ({table_result['encryption_type']})")
             else:
-                results['unencrypted_tables'] += 1
+                results['unencrypted_tables'].append(table_result)
+                results['unencrypted_tables_count'] += 1
                 print(f"    ❌ {table_name} - NOT ENCRYPTED")
 
         return results
@@ -241,25 +243,29 @@ class MySQLEncryptionScanner:
         print("="*60)
         print(f"Database: {results['database']}")
         print(f"Total Tables: {results['total_tables']}")
-        print(f"Encrypted Tables: {results['encrypted_tables']}")
-        print(f"Unencrypted Tables: {results['unencrypted_tables']}")
+        print(f"Encrypted Tables: {results['encrypted_tables_count']}")
+        print(f"Unencrypted Tables: {results['unencrypted_tables_count']}")
         
-        if results['encrypted_tables'] > 0:
-            print(f"\n📊 Encryption Rate: {(results['encrypted_tables']/results['total_tables'])*100:.1f}%")
+        if results['encrypted_tables_count'] > 0:
+            print(f"\n📊 Encryption Rate: {(results['encrypted_tables_count']/results['total_tables'])*100:.1f}%")
         
         print("\n📋 DETAILED RESULTS:")
         print("-" * 60)
         
-        for table in results['tables']:
-            status = "🔒 ENCRYPTED" if table['encrypted'] else "🔓 NOT ENCRYPTED"
+        # Print encrypted tables first
+        for table in results['encrypted_tables']:
+            status = "🔒 ENCRYPTED"
             print(f"{table['table_name']:<30} {status}")
-            
-            if table['encrypted']:
-                print(f"  └─ Type: {table['encryption_type']}")
-                if table['encryption_algorithm']:
-                    print(f"  └─ Algorithm: {table['encryption_algorithm']}")
-                if 'encrypted_columns' in table['details']:
-                    print(f"  └─ Encrypted Columns: {len(table['details']['encrypted_columns'])}")
+            print(f"  └─ Type: {table['encryption_type']}")
+            if table['encryption_algorithm']:
+                print(f"  └─ Algorithm: {table['encryption_algorithm']}")
+            if 'encrypted_columns' in table['details']:
+                print(f"  └─ Encrypted Columns: {len(table['details']['encrypted_columns'])}")
+        
+        # Print unencrypted tables
+        for table in results['unencrypted_tables']:
+            status = "🔓 NOT ENCRYPTED"
+            print(f"{table['table_name']:<30} {status}")
 
     def save_results(self, results: Dict, filename: str = None):
         """Save results to a JSON file."""
@@ -318,9 +324,9 @@ class EmailReporter:
                 <h2>📊 Scan Summary</h2>
                 <p><strong>Database:</strong> {results['database']}</p>
                 <p><strong>Total Tables:</strong> {results['total_tables']}</p>
-                <p><strong>Encrypted Tables:</strong> {results['encrypted_tables']}</p>
-                <p><strong>Unencrypted Tables:</strong> {results['unencrypted_tables']}</p>
-                <p><strong>Encryption Rate:</strong> {(results['encrypted_tables']/results['total_tables'])*100:.1f}%</p>
+                <p><strong>Encrypted Tables:</strong> {results['encrypted_tables_count']}</p>
+                <p><strong>Unencrypted Tables:</strong> {results['unencrypted_tables_count']}</p>
+                <p><strong>Encryption Rate:</strong> {(results['encrypted_tables_count']/results['total_tables'])*100:.1f}%</p>
             </div>
             
             <h2>📋 Detailed Results</h2>
@@ -336,10 +342,11 @@ class EmailReporter:
                 <tbody>
         """
         
-        for table in results['tables']:
-            status_class = "status-encrypted" if table['encrypted'] else "status-not-encrypted"
-            row_class = "encrypted" if table['encrypted'] else "not-encrypted"
-            status_text = "🔒 ENCRYPTED" if table['encrypted'] else "🔓 NOT ENCRYPTED"
+        # Add encrypted tables first
+        for table in results['encrypted_tables']:
+            status_class = "status-encrypted"
+            row_class = "encrypted"
+            status_text = "🔒 ENCRYPTED"
             
             html_body += f"""
                     <tr class="{row_class}">
@@ -349,14 +356,29 @@ class EmailReporter:
                         <td>{table['encryption_algorithm'] or 'N/A'}</td>
                     </tr>
             """
+        
+        # Add unencrypted tables
+        for table in results['unencrypted_tables']:
+            status_class = "status-not-encrypted"
+            row_class = "not-encrypted"
+            status_text = "🔓 NOT ENCRYPTED"
             
+            html_body += f"""
+                    <tr class="{row_class}">
+                        <td><strong>{table['table_name']}</strong></td>
+                        <td class="{status_class}">{status_text}</td>
+                        <td>{table['encryption_type'] or 'N/A'}</td>
+                        <td>{table['encryption_algorithm'] or 'N/A'}</td>
+                    </tr>
+            """
+        
         html_body += """
                 </tbody>
             </table>
             
             <div class="footer">
                 <p>This report was generated by MySQL Database Encryption Scanner</p>
-                <p>For security questions, please contact your database administrator</p>
+                <p>For security questions, please contact <a href="mailto:shivang.gupta@octrotalk.com">developer</a></p>
             </div>
         </body>
         </html>
